@@ -1,0 +1,108 @@
+name: 🧪 CI — Test & Lint
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install linting tools
+        run: pip install black isort flake8 mypy
+
+      - name: Black formatting check
+        run: black --check --diff src/ scripts/ tests/
+
+      - name: isort import ordering check
+        run: isort --check-only --diff src/ scripts/ tests/
+
+      - name: Flake8 linting
+        run: flake8 src/ scripts/ tests/ --max-line-length 100 --ignore E501,W503
+
+  test:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install CPU-only dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install transformers datasets peft trl evaluate
+          pip install pytest pytest-asyncio pyyaml sympy
+          pip install -r requirements-dev.txt || true
+
+      - name: Run unit tests
+        run: pytest tests/ -v --timeout=120 -x
+
+  validate-configs:
+    name: ✅ Validate Config Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install pyyaml
+        run: pip install pyyaml
+      - name: Validate YAML configs
+        run: |
+          python -c "
+          import yaml, glob, sys
+          errors = []
+          for f in glob.glob('configs/*.yaml'):
+              try:
+                  yaml.safe_load(open(f))
+                  print(f'✅ {f}')
+              except yaml.YAMLError as e:
+                  errors.append(f'{f}: {e}')
+                  print(f'❌ {f}: {e}')
+          if errors:
+              sys.exit(1)
+          print('All configs valid!')
+          "
+
+  validate-dataset-schema:
+    name: 📊 Validate Dataset Schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Validate sample dataset
+        run: |
+          python -c "
+          import json
+          required_fields = ['id', 'year', 'subject', 'question', 'correct_answer']
+          errors = []
+          with open('dataset/samples/sample_jee_cot.jsonl') as f:
+              for i, line in enumerate(f):
+                  ex = json.loads(line)
+                  for field in required_fields:
+                      if field not in ex:
+                          errors.append(f'Row {i}: missing {field}')
+          if errors:
+              print('\n'.join(errors)); exit(1)
+          print('✅ Dataset schema valid!')
+          "

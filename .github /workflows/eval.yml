@@ -1,0 +1,67 @@
+name: 📊 Scheduled Evaluation
+
+on:
+  schedule:
+    - cron: "0 2 * * 0"   # Every Sunday at 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      model_path:
+        description: "Model checkpoint path or HF hub ID"
+        required: true
+        default: "checkpoints/jee-llm-v1"
+      benchmark:
+        description: "Benchmark to run"
+        required: true
+        default: "jeebench"
+
+jobs:
+  evaluate:
+    name: 🎯 Run JEEBench Evaluation
+    runs-on: [self-hosted, gpu]   # Requires self-hosted GPU runner
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cu118
+          pip install -r requirements.txt
+
+      - name: Run evaluation
+        env:
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python src/evaluation/evaluate.py \
+            --model_path "${{ github.event.inputs.model_path || 'checkpoints/jee-llm-v1' }}" \
+            --benchmarks "${{ github.event.inputs.benchmark || 'jeebench' }}" \
+            --subjects mathematics physics chemistry \
+            --output_dir results/
+
+      - name: Upload evaluation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-results-${{ github.run_id }}
+          path: results/
+          retention-days: 90
+
+      - name: Comment results on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('results/jeebench_results.json'));
+            const acc = (results.overall_accuracy * 100).toFixed(1);
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 📊 JEEBench Evaluation Results\n\n**Overall Accuracy: ${acc}%**\n\nSee artifacts for full report.`
+            });
