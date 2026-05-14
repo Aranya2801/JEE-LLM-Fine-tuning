@@ -1,0 +1,119 @@
+<svg viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg" font-family="'Inter','Segoe UI',sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f0c29"/>
+      <stop offset="50%" style="stop-color:#302b63"/>
+      <stop offset="100%" style="stop-color:#24243e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+    <linearGradient id="text-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a78bfa"/>
+      <stop offset="100%" style="stop-color:#ec4899"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="rgba(102,126,234,0.4)"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="300" fill="url(#bg)"/>
+
+  <!-- Decorative circuit lines -->
+  <g opacity="0.15" stroke="#667eea" stroke-width="1" fill="none">
+    <line x1="0" y1="50" x2="200" y2="50"/>
+    <line x1="200" y1="50" x2="200" y2="150"/>
+    <line x1="200" y1="150" x2="300" y2="150"/>
+    <circle cx="200" cy="50" r="4" fill="#667eea" stroke="none"/>
+    <circle cx="200" cy="150" r="4" fill="#667eea" stroke="none"/>
+    <line x1="1200" y1="250" x2="1000" y2="250"/>
+    <line x1="1000" y1="250" x2="1000" y2="150"/>
+    <line x1="1000" y1="150" x2="900" y2="150"/>
+    <circle cx="1000" cy="250" r="4" fill="#764ba2" stroke="none"/>
+    <circle cx="1000" cy="150" r="4" fill="#764ba2" stroke="none"/>
+    <line x1="100" y1="0" x2="100" y2="300"/>
+    <line x1="1100" y1="0" x2="1100" y2="300"/>
+  </g>
+
+  <!-- Floating math symbols -->
+  <g opacity="0.12" fill="#a78bfa" font-size="22" font-weight="300">
+    <text x="60" y="80">∫</text>
+    <text x="140" y="220">Σ</text>
+    <text x="1060" y="100">∂</text>
+    <text x="1120" y="240">∞</text>
+    <text x="40" y="280">λ</text>
+    <text x="1140" y="50">π</text>
+    <text x="320" y="40">∇</text>
+    <text x="870" y="260">∈</text>
+    <text x="940" y="40">⊗</text>
+  </g>
+
+  <!-- Main accent bar -->
+  <rect x="0" y="0" width="6" height="300" fill="url(#accent)"/>
+  <rect x="1194" y="0" width="6" height="300" fill="url(#accent)"/>
+
+  <!-- Brain icon circle -->
+  <circle cx="155" cy="150" r="55" fill="url(#accent)" opacity="0.15" filter="url(#shadow)"/>
+  <circle cx="155" cy="150" r="45" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.6"/>
+  <!-- Simplified brain/neural network icon -->
+  <g fill="none" stroke="url(#accent)" stroke-width="1.5" filter="url(#glow)">
+    <circle cx="145" cy="140" r="8" fill="rgba(102,126,234,0.3)"/>
+    <circle cx="165" cy="140" r="8" fill="rgba(102,126,234,0.3)"/>
+    <circle cx="155" cy="158" r="8" fill="rgba(118,75,162,0.3)"/>
+    <circle cx="135" cy="158" r="6" fill="rgba(118,75,162,0.3)"/>
+    <circle cx="175" cy="158" r="6" fill="rgba(118,75,162,0.3)"/>
+    <line x1="145" y1="148" x2="155" y2="150"/>
+    <line x1="165" y1="148" x2="155" y2="150"/>
+    <line x1="145" y1="148" x2="135" y2="156"/>
+    <line x1="165" y1="148" x2="175" y2="156"/>
+    <line x1="155" y1="150" x2="155" y2="152"/>
+    <line x1="155" y1="132" x2="155" y2="140"/>
+    <circle cx="155" cy="126" r="5" fill="rgba(167,139,250,0.4)"/>
+  </g>
+  <text x="155" y="218" text-anchor="middle" fill="#a78bfa" font-size="11" opacity="0.8">🧠 Neural</text>
+
+  <!-- Main title -->
+  <text x="600" y="115" text-anchor="middle" fill="url(#text-grad)"
+        font-size="56" font-weight="800" letter-spacing="-2" filter="url(#glow)">JEE-LLM</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="155" text-anchor="middle" fill="#e0e0e0" font-size="18" font-weight="400" opacity="0.9">
+    Fine-Tuning · QLoRA · DPO · GRPO · SPIN
+  </text>
+
+  <!-- Description line -->
+  <text x="600" y="190" text-anchor="middle" fill="#999" font-size="14">
+    Production-grade LLM for IIT-JEE Advanced Reasoning · 7B Parameter Model
+  </text>
+
+  <!-- Stat badges -->
+  <g transform="translate(390, 220)">
+    <!-- Badge 1 -->
+    <rect x="0" y="0" width="110" height="32" rx="16" fill="rgba(102,126,234,0.2)" stroke="rgba(102,126,234,0.5)" stroke-width="1"/>
+    <text x="55" y="21" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="600">📐 Math: 61.4%</text>
+  </g>
+  <g transform="translate(515, 220)">
+    <!-- Badge 2 -->
+    <rect x="0" y="0" width="110" height="32" rx="16" fill="rgba(118,75,162,0.2)" stroke="rgba(118,75,162,0.5)" stroke-width="1"/>
+    <text x="55" y="21" text-anchor="middle" fill="#c084fc" font-size="12" font-weight="600">⚛️ Phys: 56.7%</text>
+  </g>
+  <g transform="translate(640, 220)">
+    <!-- Badge 3 -->
+    <rect x="0" y="0" width="110" height="32" rx="16" fill="rgba(236,72,153,0.15)" stroke="rgba(236,72,153,0.4)" stroke-width="1"/>
+    <text x="55" y="21" text-anchor="middle" fill="#f0abfc" font-size="12" font-weight="600">🧪 Chem: 58.1%</text>
+  </g>
+
+  <!-- Bottom horizontal rule -->
+  <rect x="50" y="290" width="1100" height="1" fill="url(#accent)" opacity="0.3"/>
+
+  <!-- GitHub star hint -->
+  <text x="600" y="282" text-anchor="middle" fill="#666" font-size="11">
+    ⭐ Star the repo · MIT License · github.com/Aranya2801/JEE-LLM-Fine-tuning
+  </text>
+</svg>
