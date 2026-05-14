@@ -1,0 +1,35 @@
+# ============================================================
+# configs/spin.yaml — Stage 3: SPIN Self-Play Fine-Tuning
+# ============================================================
+
+seed: 42
+output_dir: checkpoints/stage3_spin
+
+model_path: "checkpoints/stage2_dpo/final"
+
+# SPIN iterations
+num_iterations: 3
+questions_per_iter: 5000
+spin_temperature: 0.8        # Temperature for self-generated responses
+
+# LoRA for DPO in each SPIN iteration
+lora_r: 32
+lora_alpha: 64
+
+# DPO hyperparameters per iteration
+beta: 0.1
+epochs_per_iter: 1
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: 5.0e-5        # Decays by 0.7x each iteration
+max_length: 1536
+max_prompt_length: 512
+bf16: true
+
+data:
+  cot_dataset: "dataset/jee_cot_gpt4o.jsonl"
+
+logging:
+  report_to: "wandb"
+  wandb_project: "jee-llm-finetuning"
+  run_name: "jee-spin-llama3-8b"
