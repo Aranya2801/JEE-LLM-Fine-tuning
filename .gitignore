@@ -1,0 +1,85 @@
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+*.egg-link
+.installed.cfg
+
+# ── Virtual Environments ──────────────────────────────────────
+.env
+.venv
+venv/
+env/
+ENV/
+
+# ── IDE ───────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── ML / Training ────────────────────────────────────────────
+checkpoints/
+wandb/
+runs/
+logs/
+*.ckpt
+*.pth
+*.pt
+*.bin
+*.safetensors
+results/
+outputs/
+
+# ── Jupyter ───────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ── Data ─────────────────────────────────────────────────────
+dataset/*.jsonl
+dataset/*.json
+dataset/*.csv
+!dataset/samples/
+
+# ── Secrets ───────────────────────────────────────────────────
+.env
+*.key
+*.pem
+secrets.yaml
+
+# ── Testing ───────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+
+# ── DeepSpeed ─────────────────────────────────────────────────
+zero_to_fp32.py
+latest
+
+# ── Docker ────────────────────────────────────────────────────
+*.tar
+.dockerignore
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
