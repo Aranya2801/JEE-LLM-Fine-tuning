@@ -1,175 +1,57 @@
-# ============================================================
-# Makefile — JEE-LLM-Fine-tuning Development Commands
-# ============================================================
+BASE  ?= Qwen/Qwen2.5-7B-Instruct
+EVAL  ?= dataset/jeebench.jsonl
+PY    := PYTHONPATH=src python
 
-.PHONY: all install install-dev lint format test clean train-sft train-dpo train-grpo evaluate serve-gradio serve-api help
+.PHONY: install test test-fast lint data sft merge-sft grpo grpo-marks pairs dpo eval-base eval-sft eval-grpo smoke
 
-# ── Colors ──────────────────────────────────────────────────
-BOLD   := $(shell tput bold)
-GREEN  := $(shell tput setaf 2)
-YELLOW := $(shell tput setaf 3)
-BLUE   := $(shell tput setaf 4)
-RESET  := $(shell tput sgr0)
+install:
+	pip install -e ".[train,dev]"
 
-# ── Variables ────────────────────────────────────────────────
-MODEL_PATH   ?= checkpoints/jee-llm-v1
-DEVICE       ?= cuda
-PORT         ?= 7860
-API_PORT     ?= 8000
+test:
+	pytest -q
 
-help: ## Show this help message
-	@echo "$(BOLD)$(BLUE)JEE-LLM Development Commands$(RESET)"
-	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(RESET) %s\n", $$1, $$2}'
+test-fast:
+	pytest -q -m "not smoke"
 
-# ── Installation ─────────────────────────────────────────────
-install: ## Install production dependencies
-	@echo "$(YELLOW)Installing dependencies...$(RESET)"
-	pip install torch --index-url https://download.pytorch.org/whl/cu118
-	pip install -r requirements.txt
-	pip install flash-attn --no-build-isolation
-	@echo "$(GREEN)✅ Installation complete!$(RESET)"
+lint:
+	ruff check src scripts tests
 
-install-dev: ## Install development dependencies
-	pip install -r requirements.txt
-	pip install -r requirements-dev.txt
-	pre-commit install
-	@echo "$(GREEN)✅ Dev environment ready!$(RESET)"
+data:
+	$(PY) scripts/prepare_data.py --out dataset/
+	$(PY) scripts/validate_dataset.py dataset/train_sft.jsonl dataset/jeebench.jsonl
 
-# ── Code Quality ─────────────────────────────────────────────
-lint: ## Run all linters (flake8, mypy)
-	@echo "$(YELLOW)Running linters...$(RESET)"
-	flake8 src/ scripts/ tests/ --max-line-length 100 --ignore E501,W503
-	@echo "$(GREEN)✅ Lint passed!$(RESET)"
+sft:
+	$(PY) -m jee_llm.train_sft configs/sft_qlora.yaml model.name=$(BASE)
 
-format: ## Format code with black and isort
-	@echo "$(YELLOW)Formatting code...$(RESET)"
-	black src/ scripts/ tests/ --line-length 100
-	isort src/ scripts/ tests/
-	@echo "$(GREEN)✅ Code formatted!$(RESET)"
+merge-sft:
+	$(PY) scripts/merge_adapters.py --base $(BASE) --adapter checkpoints/sft/final --out checkpoints/sft-merged
 
-format-check: ## Check formatting without modifying files
-	black --check --diff src/ scripts/ tests/ --line-length 100
-	isort --check-only --diff src/ scripts/ tests/
+grpo:
+	$(PY) -m jee_llm.train_grpo configs/grpo.yaml
 
-# ── Testing ──────────────────────────────────────────────────
-test: ## Run all unit tests
-	@echo "$(YELLOW)Running tests...$(RESET)"
-	pytest tests/ -v --timeout=120 --tb=short
-	@echo "$(GREEN)✅ All tests passed!$(RESET)"
+# abstention experiment: exam-marks reward + SKIP allowed
+grpo-marks:
+	$(PY) -m jee_llm.train_grpo configs/grpo.yaml output_dir=checkpoints/grpo-marks \
+		"reward.funcs=[jee_marks, format]" data.allow_skip=true training.run_name=grpo-jee-marks
 
-test-cov: ## Run tests with coverage report
-	pytest tests/ -v --cov=src --cov-report=html --cov-report=term-missing
+pairs:
+	$(PY) scripts/build_preference_pairs.py --model checkpoints/sft-merged --data dataset/train_rl.jsonl \
+		--k 8 --limit 10000 --out dataset/dpo_pairs.jsonl
 
-# ── Dataset Preparation ──────────────────────────────────────
-prepare-data: ## Download and prepare all datasets
-	@echo "$(YELLOW)Preparing datasets...$(RESET)"
-	python scripts/prepare_datasets.py \
-		--output_dir dataset/ \
-		--num_workers 8
-	@echo "$(GREEN)✅ Datasets ready!$(RESET)"
+dpo:
+	$(PY) -m jee_llm.train_dpo configs/dpo.yaml
 
-validate-data: ## Validate dataset quality
-	python scripts/validate_dataset.py --data_dir dataset/ --report
+EVAL_ARGS = --data $(EVAL) --num-samples 8 --temperature 0.7 --max-new-tokens 4096
 
-# ── Training ─────────────────────────────────────────────────
-train-sft: ## Run Stage 1: QLoRA SFT training
-	@echo "$(YELLOW)Starting SFT training...$(RESET)"
-	bash scripts/train_qlora.sh
+eval-base:
+	$(PY) -m jee_llm.evaluate --model $(BASE) $(EVAL_ARGS) --out results/base
 
-train-dpo: ## Run Stage 2c: DPO alignment
-	@echo "$(YELLOW)Starting DPO training...$(RESET)"
-	python src/training/train_dpo.py --config configs/dpo.yaml
+eval-sft:
+	$(PY) -m jee_llm.evaluate --model checkpoints/sft-merged $(EVAL_ARGS) --out results/sft
 
-train-grpo: ## Run Stage 2b: GRPO training
-	@echo "$(YELLOW)Starting GRPO training...$(RESET)"
-	python src/training/train_rlhf.py --config configs/grpo.yaml
+eval-grpo:
+	$(PY) -m jee_llm.evaluate --model checkpoints/sft-merged --adapter checkpoints/grpo/final $(EVAL_ARGS) --out results/grpo
 
-train-all: train-sft train-dpo train-grpo ## Run full training pipeline (Stage 1 → 2 → 3)
-	@echo "$(GREEN)🎉 Full training pipeline complete!$(RESET)"
-
-merge: ## Merge LoRA adapters into base model
-	python scripts/merge_adapters.py \
-		--base_model meta-llama/Meta-Llama-3-8B-Instruct \
-		--adapter_path checkpoints/stage2_dpo/final \
-		--output_path checkpoints/jee-llm-v1-merged
-
-# ── Evaluation ───────────────────────────────────────────────
-evaluate: ## Run full evaluation suite
-	@echo "$(YELLOW)Running evaluation...$(RESET)"
-	python src/evaluation/evaluate.py \
-		--model_path $(MODEL_PATH) \
-		--benchmarks jeebench \
-		--subjects mathematics physics chemistry \
-		--output_dir results/
-
-evaluate-quick: ## Quick evaluation on small sample
-	python src/evaluation/evaluate.py \
-		--model_path $(MODEL_PATH) \
-		--benchmarks jeebench \
-		--num_samples 50 \
-		--output_dir results/quick/
-
-# ── Inference ────────────────────────────────────────────────
-serve-gradio: ## Launch Gradio web interface
-	@echo "$(GREEN)🚀 Launching Gradio UI at http://localhost:$(PORT)$(RESET)"
-	python src/inference/gradio_app.py \
-		--model_path $(MODEL_PATH) \
-		--device $(DEVICE) \
-		--port $(PORT)
-
-serve-gradio-public: ## Launch Gradio with public URL
-	python src/inference/gradio_app.py \
-		--model_path $(MODEL_PATH) \
-		--device $(DEVICE) \
-		--port $(PORT) \
-		--share
-
-serve-api: ## Launch FastAPI inference server
-	@echo "$(GREEN)🚀 API server at http://localhost:$(API_PORT)$(RESET)"
-	JEE_MODEL_PATH=$(MODEL_PATH) JEE_DEVICE=$(DEVICE) \
-	python src/inference/api_server.py \
-		--model_path $(MODEL_PATH) \
-		--port $(API_PORT)
-
-# ── Export ───────────────────────────────────────────────────
-export-gguf: ## Export model to GGUF (for llama.cpp)
-	python scripts/export_gguf.py --model_path $(MODEL_PATH)
-
-push-hub: ## Push model to HuggingFace Hub
-	python scripts/merge_adapters.py \
-		--base_model meta-llama/Meta-Llama-3-8B-Instruct \
-		--adapter_path checkpoints/stage2_dpo/final \
-		--output_path checkpoints/jee-llm-v1-merged \
-		--push_to_hub \
-		--hub_repo Aranya2801/JEE-LLM-v1
-
-# ── Cleanup ──────────────────────────────────────────────────
-clean: ## Remove generated files and caches
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
-	rm -rf .pytest_cache .mypy_cache .coverage htmlcov/ 2>/dev/null || true
-	@echo "$(GREEN)✅ Cleaned!$(RESET)"
-
-clean-checkpoints: ## Remove all training checkpoints (CAREFUL!)
-	@echo "$(YELLOW)WARNING: This will delete all checkpoints!$(RESET)"
-	@read -p "Are you sure? (yes/no): " yn; \
-	if [ "$$yn" = "yes" ]; then rm -rf checkpoints/; echo "Deleted."; fi
-
-# ── Docker ───────────────────────────────────────────────────
-docker-build: ## Build Docker image
-	docker build -t jee-llm:latest .
-
-docker-run: ## Run Docker container
-	docker run --gpus all -p $(PORT):7860 -p $(API_PORT):8000 \
-		-v $(PWD)/checkpoints:/app/checkpoints \
-		jee-llm:latest
-
-# ── Info ─────────────────────────────────────────────────────
-info: ## Show environment info
-	@echo "$(BOLD)Environment Info$(RESET)"
-	python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
-	python -c "import transformers; print(f'Transformers: {transformers.__version__}')"
-	python -c "import peft; print(f'PEFT: {peft.__version__}')"
-	nvidia-smi --query-gpu=name,memory.total,memory.free --format=csv,noheader 2>/dev/null || echo "No NVIDIA GPU found"
+# whole pipeline on a tiny random model, CPU only, ~30s
+smoke:
+	pytest -q -m smoke
