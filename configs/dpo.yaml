@@ -1,33 +1,36 @@
-# ============================================================
-# configs/dpo.yaml — Stage 2c: DPO Configuration
-# ============================================================
+# Baseline for GRPO: DPO on (correct, wrong) pairs sampled from the SFT model.
+# Pairs come from scripts/build_preference_pairs.py.
 
 seed: 42
-output_dir: checkpoints/stage2_dpo
+output_dir: checkpoints/dpo
 
-model_path: "checkpoints/stage1_sft/final"
+model:
+  name: checkpoints/sft-merged
+  dtype: bfloat16
+  attn_implementation: sdpa
 
-lora_r: 32
-lora_alpha: 64
-
-beta: 0.1                       # KL penalty coefficient
-num_train_epochs: 3
-per_device_train_batch_size: 2
-gradient_accumulation_steps: 8
-learning_rate: 5.0e-5
-lr_scheduler_type: "cosine"
-warmup_ratio: 0.1
-max_length: 2048
-max_prompt_length: 512
-bf16: true
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  target_modules: all-linear
 
 data:
-  preference_data: "dataset/jee_preference_pairs.jsonl"
-  val_split: 0.05
+  pairs_file: dataset/dpo_pairs.jsonl
 
-logging:
-  report_to: "wandb"
-  wandb_project: "jee-llm-finetuning"
-  run_name: "jee-dpo-llama3-8b"
+training:
+  beta: 0.1
+  loss_type: [sigmoid]
+  max_length: 2560
+  learning_rate: 5.0e-7
+  lr_scheduler_type: cosine
+  warmup_steps: 0.05               # < 1 means a fraction of total steps
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 16
+  num_train_epochs: 1
+  bf16: true
+  gradient_checkpointing: true
   logging_steps: 10
-  save_steps: 300
+  save_steps: 200
+  report_to: wandb
+  run_name: dpo-rejection-sampled

@@ -1,61 +1,50 @@
-# ============================================================
-# configs/sft_qlora.yaml — Stage 1: QLoRA SFT Configuration
-# ============================================================
+# Stage 1: SFT with QLoRA. Fits on one 24 GB GPU for a 7B model at 2k context.
+# Anything under `training:` is passed straight to trl.SFTConfig.
 
 seed: 42
-output_dir: checkpoints/stage1_sft
+output_dir: checkpoints/sft
 
 model:
-  name_or_path: "meta-llama/Meta-Llama-3-8B-Instruct"
-  torch_dtype: "bfloat16"
-  attn_implementation: "flash_attention_2"
+  name: Qwen/Qwen2.5-7B-Instruct
+  dtype: bfloat16
+  attn_implementation: sdpa        # flash_attention_2 if you have it installed
 
 quantization:
   load_in_4bit: true
-  bnb_4bit_quant_type: "nf4"
-  bnb_4bit_compute_dtype: "bfloat16"
-  bnb_4bit_use_double_quant: true
+  quant_type: nf4
+  double_quant: true
 
 lora:
   r: 64
-  lora_alpha: 128
-  target_modules:
-    - "q_proj"
-    - "k_proj"
-    - "v_proj"
-    - "o_proj"
-    - "gate_proj"
-    - "up_proj"
-    - "down_proj"
-  lora_dropout: 0.05
-  bias: "none"
-
-training:
-  num_train_epochs: 3
-  per_device_train_batch_size: 4
-  per_device_eval_batch_size: 4
-  gradient_accumulation_steps: 8
-  learning_rate: 2.0e-4
-  lr_scheduler_type: "cosine"
-  warmup_ratio: 0.05
-  max_seq_length: 4096
-  group_by_length: true
-  bf16: true
-  fp16: false
-  gradient_checkpointing: true
-  optim: "paged_adamw_32bit"
-  packing: false
-  max_grad_norm: 1.0
+  alpha: 128
+  dropout: 0.05
+  target_modules: all-linear
 
 data:
-  dataset_path: "dataset/jee_cot_gpt4o.jsonl"
-  val_split: 0.05
-  prompt_template: "chatml"
+  # built by scripts/prepare_data.py; JEEBench is never in here (it's the test set)
+  train_files:
+    - dataset/train_sft.jsonl
+  eval_file: dataset/val.jsonl
+  max_train_samples: null
 
-logging:
-  report_to: "wandb"
-  wandb_project: "jee-llm-finetuning"
-  run_name: "jee-sft-qlora-llama3-8b"
+training:
+  num_train_epochs: 2
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 8       # effective batch 32
+  learning_rate: 1.0e-4
+  lr_scheduler_type: cosine
+  warmup_steps: 0.03               # < 1 means a fraction of total steps
+  weight_decay: 0.0
+  max_length: 2048
+  completion_only_loss: true            # loss on the solution only, not the question
+  packing: false
+  bf16: true
+  gradient_checkpointing: true
+  optim: paged_adamw_8bit
   logging_steps: 10
-  save_steps: 500
-  eval_steps: 500
+  eval_strategy: steps
+  eval_steps: 200
+  save_steps: 200
+  save_total_limit: 3
+  report_to: wandb
+  run_name: sft-qwen2.5-7b-qlora

@@ -1,36 +1,54 @@
-# ============================================================
-# configs/grpo.yaml — Stage 2b: GRPO (Group Relative Policy Optimization)
-# ============================================================
+# Stage 2: GRPO with verifiable rewards, starting from the SFT model.
+# Merge the SFT adapter first (scripts/merge_adapters.py) and point model.name at it.
+# Anything under `training:` is passed straight to trl.GRPOConfig.
 
 seed: 42
-output_dir: checkpoints/stage2_grpo
+output_dir: checkpoints/grpo
 
-policy_model: "checkpoints/stage1_sft/final"
+model:
+  name: checkpoints/sft-merged
+  dtype: bfloat16
+  attn_implementation: sdpa
 
-lora_r: 32
-lora_alpha: 64
-
-# GRPO hyperparameters
-num_generations: 8          # G — number of samples per question
-kl_coef: 0.05               # KL penalty
-clip_range: 0.2             # PPO clip range
-gamma: 1.0                  # Discount factor
-
-num_train_epochs: 1
-per_device_train_batch_size: 2
-gradient_accumulation_steps: 16
-learning_rate: 1.0e-5
-warmup_ratio: 0.05
-max_new_tokens: 1024
-temperature: 0.9
-bf16: true
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.0
+  target_modules: all-linear
 
 data:
-  rl_questions: "dataset/jee_rl_questions.jsonl"   # Questions only (no CoT)
+  train_files:
+    - dataset/train_rl.jsonl      # questions with checkable answers; solutions not needed
+  allow_skip: false               # true for the abstention experiment (needs jee_marks reward)
+  max_train_samples: null
 
-logging:
-  report_to: "wandb"
-  wandb_project: "jee-llm-finetuning"
-  run_name: "jee-grpo-llama3-8b"
-  logging_steps: 10
-  save_steps: 200
+reward:
+  # correctness = 0/1, jee_marks = exam marks scaled to [-0.5, 1]
+  funcs: [correctness, format]
+  weights: [1.0, 0.1]
+
+training:
+  num_generations: 8              # group size G
+  max_completion_length: 1536
+  temperature: 1.0
+  beta: 0.0                       # no KL term, as in Dr. GRPO / DAPO
+  loss_type: dr_grpo
+  scale_rewards: none             # don't divide advantages by group std (Dr. GRPO)
+  mask_truncated_completions: true
+  learning_rate: 1.0e-6
+  lr_scheduler_type: constant_with_warmup
+  warmup_steps: 0.02               # < 1 means a fraction of total steps
+  per_device_train_batch_size: 8   # must be divisible by num_generations
+  gradient_accumulation_steps: 4
+  num_train_epochs: 1
+  bf16: true
+  gradient_checkpointing: true
+  use_vllm: true
+  vllm_mode: colocate
+  vllm_gpu_memory_utilization: 0.35
+  logging_steps: 5
+  log_completions: true
+  save_steps: 100
+  save_total_limit: 3
+  report_to: wandb
+  run_name: grpo-correctness
